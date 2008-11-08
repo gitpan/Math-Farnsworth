@@ -2,7 +2,7 @@
 
 package Math::Farnsworth;
 
-our $VERSION = 0.5;
+our $VERSION = "0.5.1";
 
 use strict;
 use warnings;
@@ -40,9 +40,9 @@ sub new
 	for my $a (@modules)
 	{
 		eval 'use Math::Farnsworth::'.$a.'; Math::Farnsworth::'.$a.'::init($self->{eval});';
-		print "-------FAILED? $a\n";
-		print $@;
-		print "\n";
+		#print "-------FAILED? $a\n";
+		#print $@;
+		#print "\n";
 	}
 
 	bless $self;
@@ -55,7 +55,7 @@ sub runString
 	my @torun = @_; # we can run an array
 	my @results;
 
-	push @results, $self->{eval}->eval($_) for (@torun);
+	push @results, $self->{eval}->eval($_)->toperl($self->{eval}{units}) for (@torun);
 
 	return wantarray ? @results : $results[-1]; #return all of them in array context, only the last in scalar context
 }
@@ -77,7 +77,7 @@ sub runFile
 	#as much as i would like this to work WITHOUT this i need to filter blank lines out
 	$lines =~ s/\s*\n\s*\n\s*/\n/;
 		
-	return $self->{eval}->eval($lines);
+	return $self->{eval}->eval($lines)->toperl($self->{eval}{units});
 
 #	while(<$fh>)
 #	{
@@ -97,7 +97,7 @@ sub prettyOut
 	my $self = shift;
 	my $input = shift;
 
-	return $input->toPerl($self->{eval}{units});
+	return $input->toperl($self->{eval}{units});
 }
 
 1;
@@ -119,7 +119,7 @@ Math::Farnsworth - A Turing Complete Language for Mathematics
 
   my $result = $hubert->runFile("file.frns");
 
-  print $hubert->prettyOut($result);
+  print $result;
 
 =head1 DESCRIPTION
 
