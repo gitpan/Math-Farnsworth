@@ -3,7 +3,10 @@ package Math::Farnsworth::Variables;
 use strict;
 use warnings;
 
+use Math::Farnsworth::Error;
+
 use Data::Dumper;
+use Carp qw(cluck carp);
 
 #this is very simple right now but i'll need to make a way to inherit
 #variables from an old Math::Farnsworth::Variables class so that i can do
@@ -18,6 +21,11 @@ sub new
 	bless $self;
 }
 
+sub DESTROY
+{
+	debug 1,"VARIABLES DIE: $_[0]";
+}
+
 sub setvar
 {
 	my $self = shift;
@@ -26,7 +34,15 @@ sub setvar
 
 	if ((exists($self->{vars}{$name})) || !defined($self->{parent}))
 	{
-		$self->{vars}{$name} = $value;
+		if (exists($self->{vars}{$name}) && ref($self->{vars}{$name}) eq "REF")
+	    {
+			#we've got a reference
+			${$self->{vars}{$name}} = $value;
+		}
+		else
+		{
+		  $self->{vars}{$name} = $value;
+		}
 	}
 	else
 	{
@@ -40,8 +56,47 @@ sub declare
 	my $name = shift;
 	my $value = shift;
 
+	if (!defined($name))
+	{
+		cluck "NAME UNDEFINED!\n".Dumper([$self, $name, $value, @_]);
+	}
+
 	#really all we need to do is just set it in this scope to see it
 	$self->{vars}{$name} = $value;
+}
+
+sub setref
+{
+	my $self = shift;
+	my $name = shift;
+
+	if (!defined($name))
+	{
+		cluck "NAME UNDEFINED!\n".Dumper([$self, $name, @_]);
+	}
+
+	#really all we need to do is just set it in this scope to see it
+	$self->{vars}{$name} = $_[0]; #can't set things myself with shift, HAVE to use @_ directly
+}
+
+sub getref
+{
+	my $self = shift;
+	my $name = shift;
+	my $val;
+
+	carp "DEPRECIATED CALL TO Variables->getref()";
+
+	if (exists($self->{vars}{$name}))
+	{
+		$val = \$self->{vars}{$name};
+	}
+	elsif (defined($self->{parent}))
+	{
+		$val = $self->{parent}->getref($name);
+	}
+
+	return $val;
 }
 
 sub getvar
@@ -53,10 +108,16 @@ sub getvar
 	if (exists($self->{vars}{$name}))
 	{
 		$val = $self->{vars}{$name};
+		$val->setref(\$self->{vars}{$name}) unless (ref($val) eq "REF");
 	}
 	elsif (defined($self->{parent}))
 	{
 		$val = $self->{parent}->getvar($name);
+	}
+
+	if (ref $val eq "REF")
+	{ #we've got one set by reference
+		$val = $$val; #deref it for getting its value
 	}
 
 	return $val;

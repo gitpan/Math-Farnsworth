@@ -2,7 +2,7 @@
 
 package Math::Farnsworth;
 
-our $VERSION = "0.5.1";
+our $VERSION = "0.6.0";
 
 use strict;
 use warnings;
@@ -13,6 +13,7 @@ use Math::Farnsworth::Dimension;
 use Math::Farnsworth::Units;
 use Math::Farnsworth::FunctionDispatch;
 use Math::Farnsworth::Variables;
+use Math::Farnsworth::Output;
 use Math::Pari;
 
 use Carp qw(croak);
@@ -24,13 +25,14 @@ sub new
 	shift; #get the class off
 
 	my $self = {};
-    my @modules = @_; #i get passed a list of modules to use for standard stuff;
+	my @modules = @_; #i get passed a list of modules to use for standard stuff;
 
-	Math::Pari::setprecision(100);
+	Math::Pari::setprecision(100); #both of these need to be user configurable!
+	Math::Pari::allocatemem(400_000_00);
 
 	if (@modules < 1)
 	{
-		@modules = ("Units::Standard", "Functions::Standard", "Functions::StdMath", "Functions::GoogleTranslate"); #standard modules to include
+		@modules = ("Units::Standard", "Functions::Standard", "Functions::StdMath", "Functions::GoogleTranslate", "Units::Currency"); #standard modules to include
 	}
 
 	#print Dumper(\@modules);
@@ -40,6 +42,7 @@ sub new
 	for my $a (@modules)
 	{
 		eval 'use Math::Farnsworth::'.$a.'; Math::Farnsworth::'.$a.'::init($self->{eval});';
+#		die $@ if $@;
 		#print "-------FAILED? $a\n";
 		#print $@;
 		#print "\n";
@@ -55,7 +58,7 @@ sub runString
 	my @torun = @_; # we can run an array
 	my @results;
 
-	push @results, $self->{eval}->eval($_)->toperl($self->{eval}{units}) for (@torun);
+	push @results, new Math::Farnsworth::Output($self->{eval}{units},$self->{eval}->eval($_), $self->{eval}) for (@torun);
 
 	return wantarray ? @results : $results[-1]; #return all of them in array context, only the last in scalar context
 }
@@ -69,15 +72,18 @@ sub runFile
 
 	open(my $fh, "<", $filename) or die "couldn't open: $!";
 	my $lines;
-	{local $/;
-		$lines = <$fh>; #slurp the file! we need it!
+	my $first = 1;
+	while(<$fh>)
+	{
+		$first=0, next if ($first && $_ =~ /^#!/); #skip a shebang line, not part of the language but makes it possible to have executable .frns files!
+		$lines .= $_; 
 	}
     close($fh);
 
-	#as much as i would like this to work WITHOUT this i need to filter blank lines out
+	#as much as i would like this to work WITHOUT this i need to filter blank lines out #not as sure i need to do this anymore! need tests to check
 	$lines =~ s/\s*\n\s*\n\s*/\n/;
 		
-	return $self->{eval}->eval($lines)->toperl($self->{eval}{units});
+	return new Math::Farnsworth::Output($self->{eval}{units},$self->{eval}->eval($lines), $self->{eval});
 
 #	while(<$fh>)
 #	{
@@ -92,13 +98,13 @@ sub runFile
 }
 
 #this will wrap around a lot of the funky code for creating a nice looking output
-sub prettyOut
-{
-	my $self = shift;
-	my $input = shift;
+#sub prettyOut
+#{
+#	my $self = shift;
+#	my $input = shift;
 
-	return $input->toperl($self->{eval}{units});
-}
+#	return $input->toperl($self->{eval}{units});
+#}
 
 1;
 __END__
@@ -123,9 +129,9 @@ Math::Farnsworth - A Turing Complete Language for Mathematics
 
 =head1 DESCRIPTION
 
-THIS IS A BETA RELEASE! There are typos in the error messages and in the POD.  There are also probably plenty of bugs.  It is being released early because there have been a number of people who have shown interest in having it released.  Not every feature is documented yet and a future release will have that cleaned up along with some of the hairier parts of the internal API.
+THIS IS A BETA RELEASE, perpetually so! There are typos in the error messages and in the POD.  There are also probably plenty of bugs.  It is being released early because there have been a number of people who have shown interest in having it released.  Not every feature is documented yet and a future release will have that cleaned up along with some of the hairier parts of the internal API.
 Math::Farnsworth is a programming language originally inspired by Frink (see http://futureboy.homeip.net/frinkdocs/ ).
-However due to certain difficulties during the creation of it, the syntax has changed slightly and the capabilities are also different.
+However due to creative during the creation of it, the syntax has changed significantly and the capabilities are also different.
 Some things Math::Farnsworth can do a little better than Frink, other areas Math::Farnsworth lacks.
 
 =head2 PREREQUISITS
@@ -144,7 +150,8 @@ L<Math::Pari>
 
 =item *
 
-L<Date::Manip>
+L<DateTime>
+L<DateTimeX::Easy>
 
 The following are optional
 
@@ -157,6 +164,14 @@ L<REST::Google::Translate>
 =item *
 
 L<HTML::Entities>
+
+For the currency support
+
+=item *
+
+L<Finance::Currency::Convert::XE>
+
+	NOTE: For the currency units to work you currently need to call C<updatecurrencies[]> before they will be available, this will change
 
 =back
 
@@ -184,6 +199,9 @@ None by default.
 =head2 KNOWN BUGS
 
 At the moment all known bugs are related to badly formatted output, this will be rectified in a future release.
+And there are a number of unfinished error messages, and a few issues with the way arrays work.
+
+There is also a known issue with the size of scopes.  I do not know if I will be able to fix it, and until then i recommend NOT using recursive algorithms because it will cause everything to balloon way up in memory usage.
 
 =head2 MISSING FEATURES
 
@@ -209,15 +227,15 @@ Better defaults for certain types of output
 
 =item *
 
-Passing arguments by reference
-
-=item *
-
 Syntax tree introspection inside the language itself
 
 =item *
 
 Better Documentation
+
+=item *
+
+Objects!
 
 =back
 
@@ -225,9 +243,7 @@ Better Documentation
 
 L<Math::Farnsworth::Docs::Syntax> L<Math::Farnsworth::Docs::Functions>
 
-
-There is also an RT tracker for the module (this may change) setup at
-L<http://farnsworth.sexypenguins.com/>, you can also reach the tracker by sending an email to E<lt>farnsworth.rt@gmail.comE<gt>
+Please use the bug tracker available from CPAN to submit bugs.
 
 =head1 AUTHOR
 
@@ -235,11 +251,8 @@ Ryan Voots E<lt>simcop@cpan.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008 by Ryan Voots
+Copyright (C) 2009 by Ryan Voots
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.0 or,
-at your option, any later version of Perl 5 you may have available.
-
+This library is free software; It is licensed exclusively under the Artistic License version 2.0 only.
 
 =cut

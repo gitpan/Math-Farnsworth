@@ -293,7 +293,7 @@ candela := cd   // Official definition:
 i := (-1) ^ (1/2) //this is intrinsic to Math::PARI, i don't need to do anything special for it // if you include Functions::StdMath this gets redefined with the more accurate sqrt[]
  
 // Define unit combinations
-1   ||| dimensionless
+//1   ||| dimensionless //POINTLESS!
 
 m^2 ||| area
 m^3 ||| volume
@@ -1668,11 +1668,11 @@ earth_flattening :=         (earthradius_equatorial-earthradius_polar)/earthradi
 // Larger moons... their distances are the average distances from their planet.
 
 // Mars
-phobosdist = 9378.5 km
-phobosmass = 1.08e16 kg
+phobosdist := 9378.5 km
+phobosmass := 1.08e16 kg
 
-deimosdist = 23458. km
-deimosmass = 1.8e15 kg
+deimosdist := 23458. km
+deimosmass := 1.8e15 kg
 
 // Jupiter
 iodist       := 422000. km
@@ -4098,6 +4098,8 @@ smoot := 5 feet + 7 inches  // Height of Oliver R. Smoot Jr. see:
            // http://spectrum.lbl.gov/www/personnel/smoot/smoot-measure.html
 True := (1 > 0)
 False := (0 > 1)
+
+undef := ([1,,2])@1$ //Make the engine generate the value for me, why should i make NEW syntax to do it when this works too, also why should i avoid making something else
 
 phi := (1 + 5^(1/2))/2
 
